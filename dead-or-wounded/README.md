@@ -1,7 +1,7 @@
 # Dead or Wounded
 
 A multiplayer-capable number-guessing game (Mastermind/Bulls-and-Cows style)
-with a Java backend and a small HTML/CSS/JS frontend.
+with a Java backend and a Java Swing desktop GUI.
 
 Each game generates a secret number with unique digits. Players submit
 guesses of the same length and get back:
@@ -25,20 +25,25 @@ game/
 │   └── SecretNumberGenerator.java
 ├── api/                   protocol-agnostic application layer
 │   ├── GameController.java     orchestrates core/ for both transports
-│   ├── HttpApiServer.java      JSON-over-HTTP adapter (for the frontend)
+│   ├── HttpApiServer.java      JSON-over-HTTP adapter (network clients)
 │   └── dto/                    request/response records
-└── server/                 raw TCP transport
-    ├── GameServer.java         accept loop + thread pool
-    ├── ClientHandler.java      per-connection line-protocol parser
-    └── ServerConfig.java       CLI args / defaults
+├── server/                 raw TCP transport
+│   ├── GameServer.java         accept loop + thread pool
+│   ├── ClientHandler.java      per-connection line-protocol parser
+│   └── ServerConfig.java       CLI args / defaults
+└── gui/                   desktop UI
+    └── GameGui.java            Swing client, plays directly against core/
 ```
 
 `core/` has no knowledge of sockets, HTTP, or threads beyond what it needs
-for its own thread-safety — both transports (raw TCP and HTTP) go through
-the same `GameController`, so a game is playable interchangeably from
-either. The project intentionally has **zero external dependencies** — the
-HTTP layer uses only `com.sun.net.httpserver` (bundled in the JDK), so
-`pom.xml` stays dependency-free.
+for its own thread-safety — both network transports (raw TCP and HTTP) go
+through the same `GameController`, so a game is playable interchangeably
+from either. The Swing GUI (`gui/GameGui`) also goes through
+`GameController`, but in-process with its own `GameSessionManager` instead
+of over the network. The project intentionally has **zero external
+dependencies** — the HTTP layer uses only `com.sun.net.httpserver`
+(bundled in the JDK) and the GUI uses only `javax.swing`, so `pom.xml`
+stays dependency-free.
 
 ## Protocols
 
@@ -97,11 +102,33 @@ All optional, passed as `--flag value` to `Main`:
 There is no turn timer — sessions stay open indefinitely until won, lost,
 or the process restarts (sessions are in-memory only).
 
-## Frontend
+## GUI
 
-`frontend/` is a static, build-free HTML/CSS/JS page. With the backend
-running, just open `frontend/index.html` in a browser — it talks to the
-HTTP API on `localhost:8081`.
+`gui/GameGui.java` is a Swing desktop client. It plays directly against
+the core game engine in its own process (its own `GameSessionManager`),
+so it needs no server running — just launch it on its own.
+
+```bash
+mvn clean package
+java -cp target/classes game.gui.GameGui
+```
+
+Or without Maven:
+
+```bash
+javac -d target/classes $(find src/main/java -name "*.java")
+java -cp target/classes game.gui.GameGui
+```
+
+It accepts the same `--secretNumberLength` / `--maxAttempts` flags as
+`Main` (see [Config flags](#config-flags)); `--port` / `--httpPort` /
+`--threadPoolSize` are accepted but unused since the GUI doesn't open any
+network ports.
+
+The GUI is a separate, local single-player experience — it does not talk
+to `game.Main`'s TCP/HTTP servers. For networked/multiplayer play, use the
+raw TCP or HTTP protocols below directly (e.g. from another client you
+write, or tools like `ncat`/`curl`).
 
 ## Testing manually
 
