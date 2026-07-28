@@ -83,6 +83,7 @@ public class RaceGui extends JFrame {
     private int secretLength;
     private int maxAttempts;
     private int guessCount;
+    private int hostedPort;
     private boolean raceOver;
     private boolean isHost;
     private Timer pollTimer;
@@ -111,6 +112,7 @@ public class RaceGui extends JFrame {
     private final JTextField guessField = new JTextField(14);
     private final JButton guessButton = new JButton("Guess");
     private final JLabel statusLabel = new JLabel(" ");
+    private final JButton playAgainButton = new JButton("Play again");
     private final JButton leaveButton = new JButton("Leave race");
     private final JLabel errorLabel = new JLabel(" ");
 
@@ -169,6 +171,7 @@ public class RaceGui extends JFrame {
 
         guessButton.addActionListener(e -> onGuess());
         guessField.addActionListener(e -> onGuess());
+        playAgainButton.addActionListener(e -> onPlayAgain());
         leaveButton.addActionListener(e -> resetToLandingScreen());
     }
 
@@ -295,9 +298,13 @@ public class RaceGui extends JFrame {
         guessRow.add(guessButton, gc);
 
         statusLabel.setFont(statusLabel.getFont().deriveFont(Font.BOLD));
+        playAgainButton.setEnabled(false);
+        JPanel statusButtons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
+        statusButtons.add(playAgainButton);
+        statusButtons.add(leaveButton);
         JPanel statusRow = new JPanel(new BorderLayout());
         statusRow.add(statusLabel, BorderLayout.CENTER);
-        statusRow.add(leaveButton, BorderLayout.EAST);
+        statusRow.add(statusButtons, BorderLayout.EAST);
 
         JPanel top = new JPanel();
         top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
@@ -353,21 +360,27 @@ public class RaceGui extends JFrame {
         try {
             ensureLocalServerRunning(port);
             baseUrl = "http://localhost:" + port + "/api";
-
-            String body = "{\"playerName\":\"" + jsonEscape(playerName) + "\"}";
-            String resp = request("POST", "/race/new", body);
-
-            raceId = extractString(resp, "raceId");
-            secretLength = extractInt(resp, "secretLength");
-            maxAttempts = extractInt(resp, "maxAttempts");
+            hostedPort = port;
             isHost = true;
-
-            List<String> addresses = NetworkUtil.listLanIpv4Addresses();
-            enterRace("Hosting - Race code: " + raceId);
-            populateInviteRows(addresses, port, raceId);
+            startNewHostedRace();
         } catch (RuntimeException ex) {
             showError(ex.getMessage());
         }
+    }
+
+    /** Creates a brand-new race on the already-running host server and enters it - used both
+     *  for the initial "Start Hosting" and for "Play again" (same server, same player, fresh secret). */
+    private void startNewHostedRace() {
+        String body = "{\"playerName\":\"" + jsonEscape(playerName) + "\"}";
+        String resp = request("POST", "/race/new", body);
+
+        raceId = extractString(resp, "raceId");
+        secretLength = extractInt(resp, "secretLength");
+        maxAttempts = extractInt(resp, "maxAttempts");
+
+        List<String> addresses = NetworkUtil.listLanIpv4Addresses();
+        enterRace("Hosting - Race code: " + raceId);
+        populateInviteRows(addresses, hostedPort, raceId);
     }
 
     private void ensureLocalServerRunning(int port) {
@@ -475,8 +488,28 @@ public class RaceGui extends JFrame {
         statusLabel.setText("Race in progress...");
         statusLabel.setForeground(new Color(0x555555));
         setGuessEnabled(true);
+        playAgainButton.setEnabled(false);
         guessField.requestFocusInWindow();
         startPolling();
+    }
+
+    /** Lets a player start a fresh race without going back to the landing screen. A host gets
+     *  an instant new race on the same server; a joiner needs a new code from their host (a race
+     *  is one-shot once it has a winner), so they're dropped onto the join form with their
+     *  server address and name already filled in - only the code needs re-entering/pasting. */
+    private void onPlayAgain() {
+        clearError();
+        if (isHost) {
+            try {
+                startNewHostedRace();
+            } catch (RuntimeException ex) {
+                showError(ex.getMessage());
+            }
+        } else {
+            joinCodeField.setText("");
+            cardLayout.show(screens, "join");
+            joinCodeField.requestFocusInWindow();
+        }
     }
 
     private void onGuess() {
@@ -511,6 +544,7 @@ public class RaceGui extends JFrame {
                     statusLabel.setText("Out of your " + maxAttempts + " attempts - still waiting to see who wins.");
                     statusLabel.setForeground(new Color(0xB03A3A));
                     setGuessEnabled(false);
+                    playAgainButton.setEnabled(true);
                 }
                 default -> {
                     statusLabel.setText("Race in progress - attempt " + attemptsUsed + "/" + maxAttempts);
@@ -572,6 +606,7 @@ public class RaceGui extends JFrame {
         statusLabel.setText(message);
         statusLabel.setForeground(color);
         setGuessEnabled(false);
+        playAgainButton.setEnabled(true);
         if (pollTimer != null) {
             pollTimer.stop();
         }
