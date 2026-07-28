@@ -32,7 +32,9 @@ public class GameController {
     public GuessResponse submitGuess(GuessRequest request) {
         GameSession session = sessionManager.getSession(request.sessionId());
         GuessResult result = session.submitGuess(request.guess());
-        return new GuessResponse(result.deadCount(), result.woundedCount(), session.getHistorySnapshot().size(), session.getMaxAttempts(), session.getStatus().name());
+        GameSession.Status status = session.getStatus();
+        String secretNumber = status == GameSession.Status.IN_PROGRESS ? null : session.getSecretNumber();
+        return new GuessResponse(result.deadCount(), result.woundedCount(), session.getHistorySnapshot().size(), session.getMaxAttempts(), status.name(), secretNumber);
     }
 
     public List<String> getHistory(String sessionId) {

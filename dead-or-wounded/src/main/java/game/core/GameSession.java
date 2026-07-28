@@ -1,6 +1,5 @@
 package game.core;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -32,23 +31,12 @@ public class GameSession {
             if(status != Status.IN_PROGRESS) {
                 throw new IllegalStateException("Game session is not in progress." + status);
             }
-            validateGuessFormat(guess);
+            GuessScorer.validateFormat(guess, secretNumber.length());
 
-            int dead = 0;
-            int wounded = 0;
-            for (int i = 0; i < secretNumber.length(); i++){
-                char g = guess.charAt(i);
-                if (g == secretNumber.charAt(i)) {
-                    dead++;
-                } else if (secretNumber.indexOf(g) != -1) {
-                    wounded++;
-                }
-            }
-
-            GuessResult result = new GuessResult(guess, dead, wounded, Instant.now());
+            GuessResult result = GuessScorer.score(secretNumber, guess);
             history.add(result);
 
-            if (dead == secretNumber.length()) {
+            if (result.deadCount() == secretNumber.length()) {
                 status = Status.WON;
             } else if (history.size() >= maxAttempts) {
                 status = Status.LOST;
@@ -57,21 +45,6 @@ public class GameSession {
             return result;
         } finally {
             lock.unlock();
-        }
-    }
-
-    private void validateGuessFormat(String guess) {
-        if (guess == null || guess.length() != secretNumber.length() || !guess.chars().allMatch(Character::isDigit)) {
-            throw new IllegalArgumentException("Invalid guess format. Guess must be a numeric string of length " + secretNumber.length());
-        }
-
-        boolean[] seen = new boolean[10];
-        for (char c: guess.toCharArray()) {
-            int digit = c - '0';
-            if (seen[digit]) {
-                throw new IllegalArgumentException("Invalid guess format. Guess must not contain duplicate digits.");
-            }
-            seen[digit] = true;
         }
     }
 
@@ -95,6 +68,9 @@ public class GameSession {
 
     public String getSessionId() {
         return sessionId;
+    }
+    public String getSecretNumber() {
+        return secretNumber;
     }
     public Player getPlayer() {
         return player;

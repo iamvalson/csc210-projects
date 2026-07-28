@@ -1,6 +1,8 @@
 package game;
 
 import game.api.HttpApiServer;
+import game.api.RaceController;
+import game.core.RaceSessionManager;
 import game.server.GameServer;
 import game.server.ServerConfig;
 
@@ -8,7 +10,8 @@ public class Main {
     public static void main(String[] args) {
         ServerConfig config = ServerConfig.fromArgsOrDefaults(args);
         GameServer server = new GameServer(config);
-        HttpApiServer httpApiServer = new HttpApiServer(server.getController(), config.getHttpPort());
+        RaceController raceController = new RaceController(new RaceSessionManager(), config);
+        HttpApiServer httpApiServer = new HttpApiServer(server.getController(), raceController, config.getHttpPort());
 
         try {
             httpApiServer.start();

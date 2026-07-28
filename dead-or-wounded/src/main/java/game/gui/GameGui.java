@@ -170,7 +170,7 @@ public class GameGui extends JFrame {
             historyModel.setRowCount(0);
             guessField.setText("");
             applyGuessLengthFilter(secretLength);
-            setStatus("IN_PROGRESS", 0, maxAttempts);
+            setStatus("IN_PROGRESS", 0, maxAttempts, null);
             setGuessEnabled(true);
             guessField.requestFocusInWindow();
         } catch (RuntimeException ex) {
@@ -189,7 +189,7 @@ public class GameGui extends JFrame {
             GuessResponse resp = controller.submitGuess(new GuessRequest(sessionId, guess));
             guessCount++;
             historyModel.addRow(new Object[]{guessCount, guess, resp.deadCount(), resp.woundedCount()});
-            setStatus(resp.status(), resp.attemptsUsed(), resp.maxAttempts());
+            setStatus(resp.status(), resp.attemptsUsed(), resp.maxAttempts(), resp.secretNumber());
 
             if (!"IN_PROGRESS".equals(resp.status())) {
                 setGuessEnabled(false);
@@ -231,14 +231,15 @@ public class GameGui extends JFrame {
         guessButton.setEnabled(enabled);
     }
 
-    private void setStatus(String status, int attemptsUsed, int maxAttempts) {
+    private void setStatus(String status, int attemptsUsed, int maxAttempts, String secretNumber) {
         switch (status) {
             case "WON" -> {
                 statusLabel.setText("You won! Solved in " + attemptsUsed + " attempt(s).");
                 statusLabel.setForeground(new Color(0x2E7D46));
             }
             case "LOST" -> {
-                statusLabel.setText("Out of attempts (" + attemptsUsed + "/" + maxAttempts + "). Better luck next time.");
+                statusLabel.setText("Out of attempts (" + attemptsUsed + "/" + maxAttempts
+                        + "). The secret number was " + secretNumber + ". Better luck next time.");
                 statusLabel.setForeground(new Color(0xB03A3A));
             }
             default -> {
