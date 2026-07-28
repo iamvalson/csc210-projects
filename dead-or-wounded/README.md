@@ -36,9 +36,12 @@ game/
 │   ├── GameServer.java         accept loop + thread pool
 │   ├── ClientHandler.java      per-connection line-protocol parser
 │   └── ServerConfig.java       CLI args / defaults
+├── util/
+│   └── NetworkUtil.java        LAN IPv4 address lookup, shared by HttpApiServer and RaceGui
 └── gui/                   desktop UI
     ├── GameGui.java            single-player Swing client, plays directly against core/ in-process
-    └── RaceGui.java            multiplayer Swing client, talks to a running game.Main over HTTP
+    └── RaceGui.java            multiplayer Swing client - hosting spins up its own HttpApiServer
+                                 in-process, so no separate game.Main is required to play
 ```
 
 `core/` has no knowledge of sockets, HTTP, or threads beyond what it needs
@@ -138,7 +141,7 @@ There are two Swing clients, for the two ways to play:
 | | `GameGui` | `RaceGui` |
 |---|---|---|
 | Mode | Solo | Multiplayer race (LAN) |
-| Needs a server running? | No | Yes (`game.Main`) |
+| Needs a separate server running? | No | No — hosting starts one for you |
 | Talks to | Its own in-process engine | `HttpApiServer` over HTTP |
 
 ### `GameGui` — solo play
@@ -213,54 +216,64 @@ game state:
 
 ### Running a race
 
-**1. One person hosts the server**, on whichever machine will stay on
-during the race:
+There's no separate server to start — `RaceGui` starts one for you the
+moment you host. Both players just launch the same client:
 
 ```bash
-mvn clean package
-java -jar target/dead-or-wounded-server.jar
+java -cp target/classes game.gui.RaceGui
 ```
 
-On startup it prints the addresses it's reachable at, e.g.:
+(see [installing on another PC](#installing-on-another-pc) for how your
+friend gets this without building the project themselves.)
 
-```
-HTTP API server started on port 8081
-Reachable on your network at:
-  http://192.168.1.23:8081
-```
+You land on a screen with two buttons: **Host New Race** and **Join a
+Race**.
 
-That `192.168.1.23:8081` (yours will differ) is what everyone else needs
-to connect to. Both players must be **on the same wifi network** for this
-to work out of the box.
+**Host:**
 
-> **First-time firewall prompt:** the first time the server starts and
-> listens on a port, Windows Firewall (or macOS's firewall) will likely
-> ask whether to allow Java to accept incoming connections on private
-> networks — click **Allow**. If you miss the prompt and other players
-> can't connect, check Windows Defender Firewall → "Allow an app through
-> firewall" and make sure `java.exe` is allowed on **Private** networks.
+1. Click **Host New Race**, enter your name, leave the port at `8081`
+   unless it's already in use, click **Start Hosting**.
+2. `RaceGui` starts a local server in the background and creates the
+   race. You land on the game screen with a race code (e.g. `Z9FRT`) and,
+   below it, one row per network address this machine is reachable at,
+   each with a **Copy** button.
+3. Click **Copy** next to whichever address is your actual Wi-Fi/hotspot
+   one (ignore ones that obviously look like a VPN/virtual adapter, e.g.
+   Hyper-V's `172.24.x.x` or a `169.254.x.x` fallback) and send that
+   clipboard content to your friend however's easiest (chat, etc.) — it's
+   a single string like `172.20.10.2:8081 Z9FRT` with everything they
+   need.
 
-**2. Everyone launches `RaceGui`** (see [installing on another
-PC](#installing-on-another-pc) if it's not their machine):
+**Join:**
 
-```bash
-java -cp target\classes game.gui.RaceGui
-```
+1. Click **Join a Race**.
+2. If your host sent you their copied invite text, click **Paste
+   Invite** — it fills in the address and code for you. Otherwise type
+   the server address and race code in yourself.
+3. Enter your name, click **Join Race**.
 
-**3. One player hosts, the others join:**
+Both players must be **on the same wifi network** (or the same phone
+hotspot) for this to work out of the box.
 
-- **Host:** enter the server address (`localhost:8081` if you're on the
-  same machine as the server, otherwise the LAN address it printed, e.g.
-  `192.168.1.23:8081`), your name, and click **Host New Race**. You'll be
-  given a short race code (e.g. `Z9FRT`) — share that with the other
-  player(s) however's convenient (chat, shout across the room, etc).
-- **Joiners:** enter the *same* server address, the race code, your name,
-  and click **Join Race**.
+> **First-time firewall prompt:** the moment a host starts hosting,
+> Windows Firewall (or macOS's firewall) will likely ask whether to allow
+> Java to accept incoming connections on private networks — click
+> **Allow**. If you miss the prompt and your friend can't connect, check
+> Windows Defender Firewall → "Allow an app through firewall" and make
+> sure `java.exe` is allowed on **Private** networks.
 
-Everyone then guesses independently; the shared leaderboard (attempts per
-player) updates roughly once a second for everyone, and as soon as anyone
-wins, every other connected player is told who won and the secret number
-within a second, whether they were actively guessing or not.
+Once in the race, each player sees two tables: **Your guesses** (your own
+Dead/Wounded history, same as solo play) and **Leaderboard** (everyone's
+attempt count, updating roughly once a second). As soon as anyone wins,
+every connected player is told who won and the secret number within a
+second — whether they were actively guessing or not.
+
+If you want to run the plain backend server on its own instead (e.g. to
+host from a headless machine that no one plays from directly, or to serve
+3+ players from one always-on box), that's still `game.Main` — see
+[Building and running](#building-and-running). `RaceGui`'s host flow will
+happily reuse an already-running server on the same port instead of
+starting its own second one.
 
 ### Installing on another PC
 
@@ -280,7 +293,7 @@ To have a friend play from their own computer, they need:
 3. **Run it:**
 
    ```bash
-   java -cp path\to\classes game.gui.RaceGui
+   java -cp path/to/classes game.gui.RaceGui
    ```
 
    (adjust the path to wherever they unzipped it)

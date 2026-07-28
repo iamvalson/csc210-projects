@@ -5,12 +5,8 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
@@ -21,6 +17,7 @@ import game.api.dto.GuessResponse;
 import game.api.dto.RaceView;
 import game.core.RaceOutcome;
 import game.core.RaceStatus;
+import game.util.NetworkUtil;
 
 /**
  * Thin JSON-over-HTTP adapter in front of GameController/RaceController, for
@@ -56,29 +53,14 @@ public class HttpApiServer {
     }
 
     private void printLanAddresses(int port) {
-        try {
-            List<InetAddress> addresses = Collections.list(NetworkInterface.getNetworkInterfaces()).stream()
-                    .filter(iface -> {
-                        try {
-                            return iface.isUp() && !iface.isLoopback() && !iface.isVirtual();
-                        } catch (SocketException e) {
-                            return false;
-                        }
-                    })
-                    .flatMap(iface -> Collections.list(iface.getInetAddresses()).stream())
-                    .filter(addr -> addr instanceof java.net.Inet4Address)
-                    .toList();
-
-            if (addresses.isEmpty()) {
-                System.out.println("Could not determine a LAN address - check `ipconfig`/`ifconfig` manually.");
-                return;
-            }
-            System.out.println("Reachable on your network at:");
-            for (InetAddress addr : addresses) {
-                System.out.println("  http://" + addr.getHostAddress() + ":" + port);
-            }
-        } catch (SocketException e) {
-            System.out.println("Could not list network interfaces: " + e.getMessage());
+        List<String> addresses = NetworkUtil.listLanIpv4Addresses();
+        if (addresses.isEmpty()) {
+            System.out.println("Could not determine a LAN address - check `ipconfig`/`ifconfig` manually.");
+            return;
+        }
+        System.out.println("Reachable on your network at:");
+        for (String addr : addresses) {
+            System.out.println("  http://" + addr + ":" + port);
         }
     }
 
