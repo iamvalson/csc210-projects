@@ -13,6 +13,12 @@ import java.util.regex.Pattern;
  * Fetches a real, road-snapped path between two points from the
  * Mapbox Directions API and decodes it into a list of GeoPoints.
  *
+ * Requests overview=full rather than Mapbox's default of
+ * "simplified" -- the simplified geometry drops most waypoints and
+ * cuts corners between them, which is what makes vehicles look like
+ * they're jumping around instead of following the road; the full
+ * geometry keeps every shaping point along the actual route.
+ *
  * Requesting geometries=polyline (not polyline6) makes Mapbox encode
  * the route in the exact same Google Encoded Polyline format (5
  * decimal places) that PolylineDecoder already handles -- no
@@ -36,6 +42,7 @@ public final class MapboxDirectionsClient {
         String url = "https://api.mapbox.com/directions/v5/mapbox/" + encode(profile) + "/"
                 + coordinates
                 + "?geometries=polyline"
+                + "&overview=full"
                 + "&access_token=" + encode(accessToken);
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(url)).GET().build();
@@ -53,7 +60,11 @@ public final class MapboxDirectionsClient {
         if (!geometryMatcher.find()) {
             throw new IOException("Couldn't find a route geometry in Directions response: " + body);
         }
-        return PolylineDecoder.decode(geometryMatcher.group(1));
+        // The encoded polyline can legitimately contain a literal backslash
+        // as data, which JSON represents as "\\" -- undo that JSON-level
+        // escaping before handing the raw polyline bytes to the decoder.
+        String rawPolyline = geometryMatcher.group(1).replace("\\\\", "\\");
+        return PolylineDecoder.decode(rawPolyline);
     }
 
     private static String encode(String s) {
