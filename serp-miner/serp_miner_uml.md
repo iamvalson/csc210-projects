@@ -1,0 +1,170 @@
+# SERP Miner — UML Class Diagram
+
+Paste the Mermaid block below into **https://mermaid.live** to render and download as SVG or PNG.
+
+```mermaid
+classDiagram
+    direction LR
+
+    namespace model {
+        class SearchResult {
+            +int position
+            +String title
+            +String link
+            +String snippet
+        }
+        class PageContent {
+            +SearchResult source
+            +String bodyText
+            +List~String~ headings
+        }
+        class PageSummary {
+            +String title
+            +String link
+            +String summary
+        }
+        class Ranked {
+            <<interface>>
+            +label() String
+            +count() int
+            +sourceLinks() List~String~
+        }
+        class FeatureCount {
+            +String feature
+            +int systemCount
+            +label() String
+            +count() int
+        }
+        class HeadingEntry {
+            +String heading
+            +int occurrenceCount
+            +label() String
+            +count() int
+        }
+    }
+
+    namespace fetch {
+        class PageFetcher {
+            -int threadPoolSize
+            -Duration REQUEST_TIMEOUT
+            +fetchAll(results, onPageFetched) List~PageContent~
+            -fetchOne(SearchResult) PageContent
+        }
+    }
+
+    namespace api {
+        class SerperClient {
+            -String apiKey
+            +search(query, numResults) List~SearchResult~
+        }
+    }
+
+    namespace text {
+        class TextTokenizer {
+            <<utility>>
+            +Set~String~ STOPWORDS
+            +isSignificant(word) boolean
+            +extractWordsInOrder(text) List~String~
+            +buildWordFrequency(texts) Map
+        }
+    }
+
+    namespace extract {
+        class Extractor {
+            <<interface>>
+            +extract(pages) List~Ranked~
+            +resultLabel() String
+        }
+        class FeatureExtractor {
+            -int minSystemCount
+            +extract(pages) List~Ranked~
+        }
+        class HeadingExtractor {
+            +extract(pages) List~Ranked~
+        }
+    }
+
+    namespace summarize {
+        class ExtractiveSummarizer {
+            +summarize(pages, maxSentences) String
+        }
+    }
+
+    namespace viz {
+        class ChartRenderer {
+            +createBarChart(title, items) JFreeChart
+            +saveAsPng(chart, path)
+        }
+    }
+
+    namespace app {
+        class Mode {
+            <<enumeration>>
+            FEATURES
+            HEADINGS
+        }
+        class Pipeline {
+            -SerperClient serperClient
+            -PageFetcher pageFetcher
+            -ExtractiveSummarizer summarizer
+            +run(query, mode, numResults, onStatus) PipelineResult
+        }
+        class PipelineResult {
+            +String query
+            +List~PageSummary~ pageSummaries
+            +List~Ranked~ ranked
+            +String summary
+            +JFreeChart chart
+        }
+        class Main {
+            <<utility>>
+            +main(args)
+        }
+        class Cli {
+            <<utility>>
+            +run(args)
+        }
+    }
+
+    namespace gui {
+        class MinerApp {
+            -ListView~PageSummary~ serpResultsList
+            -ProgressIndicator progressIndicator
+            +start(Stage stage)
+            -onRun()
+            -displayResult(PipelineResult)
+        }
+        class PageSummaryCell {
+            -Hyperlink linkButton
+            +updateItem(PageSummary, boolean)
+        }
+    }
+
+    %% Inheritance & Implementation
+    Ranked <|.. FeatureCount
+    Ranked <|.. HeadingEntry
+    Extractor <|.. FeatureExtractor
+    Extractor <|.. HeadingExtractor
+
+    %% Associations
+    Pipeline --> SerperClient
+    Pipeline --> PageFetcher
+    Pipeline --> ExtractiveSummarizer
+    Pipeline --> ChartRenderer
+    Pipeline --> Extractor
+    Pipeline ..> PipelineResult : creates
+
+    SerperClient ..> SearchResult : creates
+    PageFetcher ..> PageContent : creates
+    PageContent --> SearchResult
+    FeatureExtractor ..> TextTokenizer : uses
+    ExtractiveSummarizer ..> TextTokenizer : uses
+
+    Cli --> Pipeline
+    Main --> Cli
+    Main --> MinerApp
+
+    MinerApp --> Pipeline : worker thread
+    MinerApp *-- PageSummaryCell
+    MinerApp ..> PipelineResult : consumes
+```
