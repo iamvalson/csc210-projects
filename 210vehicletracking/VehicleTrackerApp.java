@@ -31,7 +31,7 @@ public class VehicleTrackerApp {
 
     // ---- University of Lagos, Akoka campus ----
     private static final GeoPoint MAP_CENTER = new GeoPoint(6.5180, 3.3925);
-    private static final int ZOOM = 16;
+    private static final int ZOOM = 15;
     private static final int LOGICAL_SIZE = 640;   // the Static Maps "size" param (640x640)
     private static final int SCALE = 2;             // 1 or 2; 2 = sharper "retina" image
     private static final String DIRECTIONS_PROFILE = "driving"; // try "walking" if a route comes back empty

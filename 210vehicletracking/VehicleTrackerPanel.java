@@ -23,10 +23,18 @@ import javax.swing.JPanel;
  * dots -- is scaled together via an AffineTransform, so the map
  * keeps filling the panel and the dots stay aligned with the roads
  * at any window size.
+ *
+ * When there's no map image (offline demo mode -- see
+ * VehicleTrackerApp), a light grid is drawn instead of a blank
+ * background, just so there's some visual reference for motion.
  */
 public class VehicleTrackerPanel extends JPanel {
+    private static final int GRID_SPACING = 40; // in native pixels
+    private static final Color GRID_LINE_COLOR = new Color(225, 225, 225);
+    private static final Color GRID_BACKGROUND_COLOR = new Color(248, 248, 248);
+
     private final VehicleTracker tracker;
-    private final BufferedImage background; // nullable: plain background if no map was fetched
+    private final BufferedImage background; // nullable: grid background if no map was fetched
     private final int nativeWidth;
     private final int nativeHeight;
 
@@ -51,6 +59,8 @@ public class VehicleTrackerPanel extends JPanel {
 
         if (background != null) {
             g2.drawImage(background, 0, 0, null);
+        } else {
+            drawGrid(g2);
         }
 
         Map<String, Point> snapshot = tracker.getLocations();
@@ -67,6 +77,19 @@ public class VehicleTrackerPanel extends JPanel {
         }
 
         g2.dispose();
+    }
+
+    private void drawGrid(Graphics2D g2) {
+        g2.setColor(GRID_BACKGROUND_COLOR);
+        g2.fillRect(0, 0, nativeWidth, nativeHeight);
+
+        g2.setColor(GRID_LINE_COLOR);
+        for (int x = 0; x <= nativeWidth; x += GRID_SPACING) {
+            g2.drawLine(x, 0, x, nativeHeight);
+        }
+        for (int y = 0; y <= nativeHeight; y += GRID_SPACING) {
+            g2.drawLine(0, y, nativeWidth, y);
+        }
     }
 
     private Color colorFor(String id) {
